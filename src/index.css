@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Forzar variante dark basada en clase .dark */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-carbon: #222222;
+  --color-persian: #029CA3;
+  --color-sea: #07B5A7;
+  --color-wolf: #CECECE;
+  --color-zinc-custom: #FDFDFD;
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* IMPORTANTE: Establecer solo light aquí para evitar que el sistema force dark automáticamente */
+  color-scheme: light; 
+  color: var(--color-carbon);
+  background-color: #f3f4f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Modo oscuro explícito usando la clase .dark en el elemento root */
+:root.dark {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #121212;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
