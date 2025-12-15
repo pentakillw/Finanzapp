@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, Calendar, CreditCard, Settings, PieChart, Sun, Moon, X, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Wallet, Calendar, CreditCard, Settings, PieChart, Sun, Moon, X, UserCircle, LogOut } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
 import { useFinance } from '../context/FinanceContext';
+import { signOut } from '../services/auth';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -103,6 +104,14 @@ export default function Sidebar({ isOpen, onClose }) {
             <Settings className="w-5 h-5" />
             <span className="font-medium">Configuración</span>
           </NavLink>
+
+          <button 
+            onClick={async () => { await signOut(); onClose(); }}
+            className="flex items-center gap-3 px-4 py-3 w-full text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-medium">Cerrar sesión</span>
+          </button>
         </div>
       </aside>
     </>

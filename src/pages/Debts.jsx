@@ -52,7 +52,7 @@ export default function Debts() {
                 </div>
               )}
               
-              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-4 right-4 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button 
                   onClick={() => handleEdit(debt)}
                   className="p-1.5 bg-gray-100 dark:bg-white/10 text-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/20 transition-colors"

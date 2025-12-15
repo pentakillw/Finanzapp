@@ -12,16 +12,19 @@ import { TrendingUp, TrendingDown, DollarSign, Calendar, CreditCard, Wallet, Arr
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
-// Datos de ejemplo para el gráfico (idealmente vendrían del contexto también)
-const chartData = [
-  { name: 'Ene', ingresos: 4000, gastos: 2400 },
-  { name: 'Feb', ingresos: 3000, gastos: 1398 },
-  { name: 'Mar', ingresos: 2000, gastos: 9800 },
-  { name: 'Abr', ingresos: 2780, gastos: 3908 },
-  { name: 'May', ingresos: 1890, gastos: 4800 },
-  { name: 'Jun', ingresos: 2390, gastos: 3800 },
-  { name: 'Jul', ingresos: 3490, gastos: 4300 },
-];
+// Datos dinámicos por mes usando transacciones del año actual
+function buildMonthlyData(transactions) {
+  return Array.from({ length: 12 }, (_, monthIndex) => {
+    const monthTransactions = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === monthIndex && d.getFullYear() === new Date().getFullYear();
+    });
+    const income = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const name = new Date(0, monthIndex).toLocaleString('es-ES', { month: 'short' });
+    return { name, ingresos: income, gastos: expense };
+  });
+}
 
 const StatCard = ({ title, value, trend, trendValue, icon: Icon, colorClass, iconColorClass }) => (
   <div className="bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
@@ -56,16 +59,8 @@ const StatCard = ({ title, value, trend, trendValue, icon: Icon, colorClass, ico
 );
 
 export default function Dashboard() {
-  const { stats, transactions } = useFinance();
+  const { stats, transactions, formatCurrency } = useFinance();
   const { theme } = useTheme();
-
-  // Formatear moneda
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    }).format(amount);
-  };
 
   const recentTransactions = transactions.slice(0, 5);
 
@@ -130,11 +125,11 @@ export default function Dashboard() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
+        <div className="lg:col-span-2 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5" style={{ minWidth: 0 }}>
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">Flujo de Caja</h3>
-          <div className="h-[300px] w-full">
+          <div className="h-[300px] w-full" style={{ minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <AreaChart data={buildMonthlyData(transactions)} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-persian)" stopOpacity={0.1}/>
@@ -156,6 +151,7 @@ export default function Dashboard() {
                     backgroundColor: theme === 'dark' ? '#222' : '#fff',
                     color: theme === 'dark' ? '#fff' : '#000'
                   }}
+                  formatter={(value) => formatCurrency(Number(value))}
                 />
                 <Area 
                   type="monotone" 

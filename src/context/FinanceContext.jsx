@@ -1,87 +1,63 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { addDays, addWeeks, addMonths, addYears, isAfter, isSameDay, parseISO } from 'date-fns';
+import { addDays, addWeeks, addMonths, addYears, isAfter, parseISO } from 'date-fns';
+import { getMyProfile, updateMyProfile, listCategories, createCategory, deleteCategory as apiDeleteCategory, listDebts, createDebt, updateDebt as apiUpdateDebt, deleteDebt as apiDeleteDebt, listTransactions, createTransaction, updateTransaction as apiUpdateTransaction, deleteTransaction as apiDeleteTransaction, listRecurring, createRecurring, updateRecurring as apiUpdateRecurring, deleteRecurring as apiDeleteRecurring } from '../services/api';
+import { getSession, onAuthChange } from '../services/auth';
 
 const FinanceContext = createContext();
 
-const initialTransactions = [
-  { id: 1, description: 'Salario Mensual', category: 'Ingresos', date: '2025-12-14', amount: 2500.00, type: 'income', status: 'Completado' },
-  { id: 2, description: 'Supermercado', category: 'Alimentación', date: '2025-12-13', amount: 150.50, type: 'expense', status: 'Completado' },
-  { id: 3, description: 'Netflix', category: 'Entretenimiento', date: '2025-12-12', amount: 15.00, type: 'expense', status: 'Pendiente' },
-  { id: 4, description: 'Gasolina', category: 'Transporte', date: '2025-12-11', amount: 45.00, type: 'expense', status: 'Completado' },
-];
-
-const initialDebts = [
-  { id: 1, name: 'Préstamo Auto', lender: 'Banco Santander', totalAmount: 15000, paidAmount: 8500, nextPayment: '2025-01-05', monthlyPayment: 350, status: 'active' },
-  { id: 2, name: 'Tarjeta Visa', lender: 'BBVA', totalAmount: 2500, paidAmount: 500, nextPayment: '2025-01-01', monthlyPayment: 200, status: 'warning' },
-];
-
-const initialCategories = [
-  { id: 1, name: 'Ingresos', type: 'income' },
-  { id: 2, name: 'Alimentación', type: 'expense' },
-  { id: 3, name: 'Transporte', type: 'expense' },
-  { id: 4, name: 'Vivienda', type: 'expense' },
-  { id: 5, name: 'Servicios', type: 'expense' },
-  { id: 6, name: 'Entretenimiento', type: 'expense' },
-  { id: 7, name: 'Salud', type: 'expense' },
-  { id: 8, name: 'Educación', type: 'expense' },
-  { id: 9, name: 'Otros', type: 'expense' },
-];
-
-const initialRecurring = [];
-
-const initialSettings = {
-  currency: 'MXN', // MXN, USD, EUR, etc.
-  userName: 'Usuario',
-  userEmail: 'usuario@ejemplo.com'
-};
+const initialSettings = { currency: 'MXN', userName: '', userEmail: '' };
 
 export function FinanceProvider({ children }) {
-  // Cargar estado inicial desde localStorage o usar defaults
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('fp_transactions');
-    return saved ? JSON.parse(saved) : initialTransactions;
-  });
-
-  const [debts, setDebts] = useState(() => {
-    const saved = localStorage.getItem('fp_debts');
-    return saved ? JSON.parse(saved) : initialDebts;
-  });
-
-  const [categories, setCategories] = useState(() => {
-    const saved = localStorage.getItem('fp_categories');
-    return saved ? JSON.parse(saved) : initialCategories;
-  });
-
-  const [recurringTransactions, setRecurringTransactions] = useState(() => {
-    const saved = localStorage.getItem('fp_recurring');
-    return saved ? JSON.parse(saved) : initialRecurring;
-  });
-
-  const [userSettings, setUserSettings] = useState(() => {
-    const saved = localStorage.getItem('fp_settings');
-    return saved ? JSON.parse(saved) : initialSettings;
-  });
-
-  // Persistencia
-  useEffect(() => {
-    localStorage.setItem('fp_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+  const [transactions, setTransactions] = useState([]);
+  const [debts, setDebts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [recurringTransactions, setRecurringTransactions] = useState([]);
+  const [userSettings, setUserSettings] = useState(initialSettings);
+  const [ready, setReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('fp_debts', JSON.stringify(debts));
-  }, [debts]);
+    function mapTransactions(rows) {
+      return (rows || []).map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id }))
+    }
+    function mapDebts(rows) {
+      return (rows || []).map(r => ({ id: r.id, name: r.name, lender: r.lender, totalAmount: Number(r.total_amount), paidAmount: Number(r.paid_amount || 0), monthlyPayment: Number(r.monthly_payment || 0), nextPayment: r.next_payment, status: r.status }))
+    }
+    function mapCategories(rows) {
+      return (rows || []).map(r => ({ id: r.id, name: r.name, type: r.type }))
+    }
+    function mapRecurring(rows) {
+      return (rows || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active }))
+    }
 
-  useEffect(() => {
-    localStorage.setItem('fp_categories', JSON.stringify(categories));
-  }, [categories]);
-
-  useEffect(() => {
-    localStorage.setItem('fp_recurring', JSON.stringify(recurringTransactions));
-  }, [recurringTransactions]);
-
-  useEffect(() => {
-    localStorage.setItem('fp_settings', JSON.stringify(userSettings));
-  }, [userSettings]);
+    getSession().then(async s => {
+      if (s?.user) {
+        setIsAuthenticated(true)
+        const prof = await getMyProfile()
+        if (prof.data) setUserSettings({ currency: prof.data.currency || 'MXN', userName: prof.data.user_name || '', userEmail: s.user.email || '' })
+        const cats = await listCategories(); setCategories(mapCategories(cats.data))
+        const trs = await listTransactions(); setTransactions(mapTransactions(trs.data))
+        const dbs = await listDebts(); setDebts(mapDebts(dbs.data))
+        const recs = await listRecurring(); setRecurringTransactions(mapRecurring(recs.data))
+      }
+      setReady(true)
+    })
+    const { data: sub } = onAuthChange(async session => {
+      if (session?.user) {
+        setIsAuthenticated(true)
+        const prof = await getMyProfile()
+        if (prof.data) setUserSettings({ currency: prof.data.currency || 'MXN', userName: prof.data.user_name || '', userEmail: session.user.email || '' })
+        const cats = await listCategories(); setCategories(mapCategories(cats.data))
+        const trs = await listTransactions(); setTransactions(mapTransactions(trs.data))
+        const dbs = await listDebts(); setDebts(mapDebts(dbs.data))
+        const recs = await listRecurring(); setRecurringTransactions(mapRecurring(recs.data))
+      } else {
+        setIsAuthenticated(false)
+        setTransactions([]); setDebts([]); setCategories([]); setRecurringTransactions([]); setUserSettings(initialSettings)
+      }
+    })
+    return () => { sub?.subscription?.unsubscribe?.() }
+  }, [])
 
   // Lógica de generación de recurrentes
   useEffect(() => {
@@ -94,6 +70,7 @@ export function FinanceProvider({ children }) {
       let hasChanges = false;
 
       updatedRecurring = updatedRecurring.map(rec => {
+        if (rec.active === false) return rec;
         let nextDate = parseISO(rec.nextDueDate);
         let modifiedRec = { ...rec };
         let createdAny = false;
@@ -101,17 +78,7 @@ export function FinanceProvider({ children }) {
         // Mientras la fecha próxima sea hoy o anterior
         while (!isAfter(nextDate, today)) {
           // Crear transacción
-          const newTrans = {
-            id: Date.now() + Math.random(), // ID único
-            description: rec.description,
-            amount: rec.amount,
-            type: rec.type,
-            category: rec.category,
-            date: rec.nextDueDate, // Usar la fecha que correspondía
-            status: 'Pendiente', // Por defecto pendiente
-            isRecurringInstance: true,
-            recurrenceId: rec.id
-          };
+          const newTrans = { description: rec.description, amount: rec.amount, type: rec.type, category: rec.category, date: rec.nextDueDate, status: 'Pendiente', is_recurring_instance: true, recurrence_id: rec.id };
           
           newTransactions.push(newTrans);
           createdAny = true;
@@ -125,7 +92,6 @@ export function FinanceProvider({ children }) {
             default: nextDate = addMonths(nextDate, 1);
           }
           
-          // Actualizar la fecha próxima en la recurrencia
           modifiedRec.nextDueDate = nextDate.toISOString().split('T')[0];
         }
 
@@ -134,68 +100,127 @@ export function FinanceProvider({ children }) {
       });
 
       if (hasChanges) {
-        setTransactions(prev => [...newTransactions, ...prev]);
-        setRecurringTransactions(updatedRecurring);
+        Promise.all(newTransactions.map(nt => createTransaction(nt))).then(async () => {
+          const trs = await listTransactions(); setTransactions(trs.data.map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id })) || [])
+        })
+        const promises = updatedRecurring.map(r => apiUpdateRecurring(r.id, { next_due_date: r.nextDueDate }))
+        Promise.all(promises).then(async () => {
+          const recs = await listRecurring(); setRecurringTransactions(recs.data.map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })) || [])
+        })
       }
     };
 
-    if (recurringTransactions.length > 0) {
+    if (ready && recurringTransactions.length > 0) {
       processRecurring();
     }
-  }, [recurringTransactions]);
+  }, [recurringTransactions, ready]);
 
   // Acciones Transacciones
-  const addTransaction = (transaction) => {
-    setTransactions(prev => [{ ...transaction, id: Date.now() }, ...prev]);
+  const addTransaction = async (transaction) => {
+    await createTransaction(transaction)
+    const trs = await listTransactions(); setTransactions((trs.data || []).map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id })))
   };
 
-  const updateTransaction = (id, updatedData) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updatedData } : t));
+  const updateTransaction = async (id, updatedData) => {
+    await apiUpdateTransaction(id, updatedData)
+    const trs = await listTransactions(); setTransactions((trs.data || []).map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id })))
   };
 
-  const deleteTransaction = (id) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+  const deleteTransaction = async (id) => {
+    await apiDeleteTransaction(id)
+    const trs = await listTransactions(); setTransactions((trs.data || []).map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id })))
   };
 
   // Acciones Recurrentes
-  const addRecurringTransaction = (transaction) => {
-    const newRecurring = {
-      ...transaction,
-      id: Date.now(),
-      nextDueDate: transaction.date // La primera fecha es la seleccionada
-    };
-    setRecurringTransactions(prev => [...prev, newRecurring]);
+  const addRecurringTransaction = async (transaction) => {
+    await createRecurring({ description: transaction.description, amount: transaction.amount, type: transaction.type, category: transaction.category, frequency: transaction.frequency, next_due_date: transaction.date, active: true })
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
   };
 
-  const deleteRecurringTransaction = (id) => {
-    setRecurringTransactions(prev => prev.filter(t => t.id !== id));
+  const deleteRecurringTransaction = async (id) => {
+    await apiDeleteRecurring(id)
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
+  };
+
+  const updateRecurringTransaction = async (id, updatedData) => {
+    await apiUpdateRecurring(id, { description: updatedData.description, amount: updatedData.amount, type: updatedData.type, category: updatedData.category, next_due_date: updatedData.nextDueDate, frequency: updatedData.frequency, active: updatedData.active })
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
+  };
+
+  const toggleRecurringActive = async (id) => {
+    const target = recurringTransactions.find(r => r.id === id)
+    if (!target) return
+    await apiUpdateRecurring(id, { active: target.active === false ? true : false })
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
+  };
+
+  const generateRecurringInstance = async (id) => {
+    const target = recurringTransactions.find(r => r.id === id);
+    if (!target || target.active === false) return;
+    const createdDate = target.nextDueDate;
+    await createTransaction({ description: target.description, amount: target.amount, type: target.type, category: target.category, date: createdDate, status: 'Pendiente', is_recurring_instance: true, recurrence_id: target.id })
+    const trs = await listTransactions(); setTransactions((trs.data || []).map(r => ({ id: r.id, description: r.description, category: r.category, date: r.date, amount: Number(r.amount), type: r.type, status: r.status, isRecurringInstance: r.is_recurring_instance, recurrenceId: r.recurrence_id })))
+    let nextDate = parseISO(target.nextDueDate);
+    switch (target.frequency) {
+      case 'daily': nextDate = addDays(nextDate, 1); break;
+      case 'weekly': nextDate = addWeeks(nextDate, 1); break;
+      case 'monthly': nextDate = addMonths(nextDate, 1); break;
+      case 'yearly': nextDate = addYears(nextDate, 1); break;
+      default: nextDate = addMonths(nextDate, 1);
+    }
+    const nextStr = nextDate.toISOString().split('T')[0];
+    await apiUpdateRecurring(id, { next_due_date: nextStr })
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
+  };
+
+  const skipNextRecurring = async (id) => {
+    const target = recurringTransactions.find(r => r.id === id);
+    if (!target) return;
+    let nextDate = parseISO(target.nextDueDate);
+    switch (target.frequency) {
+      case 'daily': nextDate = addDays(nextDate, 1); break;
+      case 'weekly': nextDate = addWeeks(nextDate, 1); break;
+      case 'monthly': nextDate = addMonths(nextDate, 1); break;
+      case 'yearly': nextDate = addYears(nextDate, 1); break;
+      default: nextDate = addMonths(nextDate, 1);
+    }
+    const nextStr = nextDate.toISOString().split('T')[0];
+    await apiUpdateRecurring(id, { next_due_date: nextStr })
+    const recs = await listRecurring(); setRecurringTransactions((recs.data || []).map(r => ({ id: r.id, description: r.description, amount: Number(r.amount), type: r.type, category: r.category, nextDueDate: r.next_due_date, frequency: r.frequency, active: r.active })))
   };
 
   // Acciones Deudas
-  const addDebt = (debt) => {
-    setDebts(prev => [{ ...debt, id: Date.now() }, ...prev]);
+  const addDebt = async (debt) => {
+    await createDebt({ name: debt.name, lender: debt.lender, total_amount: debt.totalAmount, paid_amount: debt.paidAmount, monthly_payment: debt.monthlyPayment, next_payment: debt.nextPayment, status: debt.status })
+    const dbs = await listDebts(); setDebts((dbs.data || []).map(r => ({ id: r.id, name: r.name, lender: r.lender, totalAmount: Number(r.total_amount), paidAmount: Number(r.paid_amount || 0), monthlyPayment: Number(r.monthly_payment || 0), nextPayment: r.next_payment, status: r.status })))
   };
 
-  const updateDebt = (id, updatedData) => {
-    setDebts(prev => prev.map(d => d.id === id ? { ...d, ...updatedData } : d));
+  const updateDebt = async (id, updatedData) => {
+    await apiUpdateDebt(id, { name: updatedData.name, lender: updatedData.lender, total_amount: updatedData.totalAmount, paid_amount: updatedData.paidAmount, monthly_payment: updatedData.monthlyPayment, next_payment: updatedData.nextPayment, status: updatedData.status })
+    const dbs = await listDebts(); setDebts((dbs.data || []).map(r => ({ id: r.id, name: r.name, lender: r.lender, totalAmount: Number(r.total_amount), paidAmount: Number(r.paid_amount || 0), monthlyPayment: Number(r.monthly_payment || 0), nextPayment: r.next_payment, status: r.status })))
   };
 
-  const deleteDebt = (id) => {
-    setDebts(prev => prev.filter(d => d.id !== id));
+  const deleteDebt = async (id) => {
+    await apiDeleteDebt(id)
+    const dbs = await listDebts(); setDebts((dbs.data || []).map(r => ({ id: r.id, name: r.name, lender: r.lender, totalAmount: Number(r.total_amount), paidAmount: Number(r.paid_amount || 0), monthlyPayment: Number(r.monthly_payment || 0), nextPayment: r.next_payment, status: r.status })))
   };
 
   // Acciones Categorías
-  const addCategory = (category) => {
-    setCategories(prev => [...prev, { ...category, id: Date.now() }]);
+  const addCategory = async (category) => {
+    await createCategory({ name: category.name, type: category.type })
+    const cats = await listCategories(); setCategories((cats.data || []).map(r => ({ id: r.id, name: r.name, type: r.type })))
   };
 
-  const deleteCategory = (id) => {
-    setCategories(prev => prev.filter(c => c.id !== id));
+  const deleteCategory = async (id) => {
+    await apiDeleteCategory(id)
+    const cats = await listCategories(); setCategories((cats.data || []).map(r => ({ id: r.id, name: r.name, type: r.type })))
   };
 
   // Acciones Configuración
-  const updateUserSettings = (newSettings) => {
-    setUserSettings(prev => ({ ...prev, ...newSettings }));
+  const updateUserSettings = async (newSettings) => {
+    await updateMyProfile({ user_name: newSettings.userName, currency: newSettings.currency })
+    const prof = await getMyProfile();
+    if (prof.data) setUserSettings({ currency: prof.data.currency || 'MXN', userName: prof.data.user_name || '', userEmail: userSettings.userEmail })
   };
 
   // Helper para formatear moneda
@@ -226,11 +251,17 @@ export function FinanceProvider({ children }) {
       categories,
       recurringTransactions,
       userSettings,
+      ready,
+      isAuthenticated,
       addTransaction,
       updateTransaction,
       deleteTransaction,
       addRecurringTransaction,
       deleteRecurringTransaction,
+      updateRecurringTransaction,
+      toggleRecurringActive,
+      generateRecurringInstance,
+      skipNextRecurring,
       addDebt,
       updateDebt,
       deleteDebt,

@@ -1,34 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { Repeat } from 'lucide-react';
 
-export default function TransactionForm({ onClose, initialData = null }) {
+export default function TransactionForm({ onClose, initialData = null, defaultDate = null }) {
   const { addTransaction, updateTransaction, addRecurringTransaction, categories } = useFinance();
-  const [formData, setFormData] = useState({
-    description: '',
-    amount: '',
-    type: 'expense',
-    category: '',
-    date: new Date().toISOString().split('T')[0],
-    status: 'Completado',
-    isRecurring: false,
-    frequency: 'monthly'
-  });
-
-  useEffect(() => {
+  const [formData, setFormData] = useState(() => {
     if (initialData) {
-      setFormData({
+      return {
         ...initialData,
         date: initialData.date.split('T')[0] // Asegurar formato fecha
-      });
+      };
     }
-  }, [initialData]);
+    return {
+      description: '',
+      amount: '',
+      type: 'expense',
+      category: '',
+      date: defaultDate || new Date().toISOString().split('T')[0],
+      status: 'Completado',
+      isRecurring: false,
+      frequency: 'monthly'
+    };
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const dataToSave = {
-      ...formData,
-      amount: parseFloat(formData.amount)
+      description: formData.description,
+      amount: parseFloat(formData.amount),
+      type: formData.type,
+      category: formData.category,
+      date: formData.date,
+      status: formData.status,
+      // Estos solo si es instancia recurrente (los rellena el contexto cuando corresponde)
+      is_recurring_instance: undefined,
+      recurrence_id: undefined
     };
 
     if (initialData) {
@@ -38,7 +44,14 @@ export default function TransactionForm({ onClose, initialData = null }) {
     } else {
       // Nueva transacción
       if (formData.isRecurring) {
-        addRecurringTransaction(dataToSave);
+        addRecurringTransaction({
+          description: formData.description,
+          amount: parseFloat(formData.amount),
+          type: formData.type,
+          category: formData.category,
+          date: formData.date,
+          frequency: formData.frequency
+        });
         // También creamos la primera instancia si el usuario lo desea
         // Por simplicidad, asumimos que si crea una recurrente con fecha de hoy,
         // el contexto la generará automáticamente o podemos forzarla aquí.

@@ -9,6 +9,9 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import { FinanceProvider } from './context/FinanceContext';
 import { ThemeProvider } from './context/ThemeContext';
+import RequireAuth from './components/RequireAuth';
+import SignIn from './pages/SignIn';
+import SignUp from './pages/SignUp';
 
 function App() {
   return (
@@ -16,14 +19,18 @@ function App() {
       <FinanceProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="transactions" element={<Transactions />} />
-              <Route path="calendar" element={<CalendarPage />} />
-              <Route path="debts" element={<Debts />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
+            <Route element={<RequireAuth />}> 
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="transactions" element={<Transactions />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="debts" element={<Debts />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
             </Route>
+            <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/sign-up" element={<SignUp />} />
           </Routes>
         </BrowserRouter>
       </FinanceProvider>
