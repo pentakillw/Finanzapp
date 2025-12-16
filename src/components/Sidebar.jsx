@@ -23,13 +23,13 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Overlay for mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-black/50 z-[45] md:hidden backdrop-blur-sm transition-opacity"
           onClick={onClose}
         />
       )}
 
       <aside className={cn(
-        "bg-[var(--color-carbon)] dark:bg-[#1a1a1a] text-white h-screen flex flex-col fixed left-0 top-0 z-30 transition-transform duration-300 border-r border-white/5 dark:border-white/10 w-64",
+        "bg-[var(--color-carbon)] dark:bg-[#1a1a1a] text-white h-[100dvh] flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300 border-r border-white/5 dark:border-white/10 w-72 md:w-64 shadow-2xl md:shadow-none",
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
         <div className="p-6 flex items-center justify-between gap-3">

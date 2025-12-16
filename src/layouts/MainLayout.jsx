@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
 import { ChevronRight, Home, Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import MobileNavbar from '../components/MobileNavbar';
 
 // Mapa de rutas a nombres legibles
 const routeNames = {
@@ -81,12 +82,14 @@ export default function MainLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
           <div className="max-w-7xl mx-auto">
             <Breadcrumbs />
             <Outlet />
           </div>
         </main>
+        
+        <MobileNavbar onOpenSidebar={() => setIsSidebarOpen(true)} />
       </div>
     </div>
   );
